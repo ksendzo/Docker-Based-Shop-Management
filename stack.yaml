@@ -1,0 +1,121 @@
+version: '3'
+
+services:
+  authenticationDB:
+    image: mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 10s
+      retries: 10
+    volumes:
+    - dbdata:/var/lib/mysql
+    networks:
+      - auth_net
+  authenticationDBMigration:
+    image: authenticationdbmigration
+    environment:
+      - DATABASE_URL=authenticationDB
+    networks:
+      - auth_net
+  authentication:
+    image: authentication
+    environment:
+      - DATABASE_URL=authenticationDB
+    ports:
+    - 5002:5002
+    networks:
+      - auth_net
+  shopDB:
+    image: mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
+      timeout: 10s
+      retries: 10
+    volumes:
+      - dbdatashop:/var/lib/mysql
+    security_opt:
+      - seccomp:unconfined
+    networks:
+      - customer_net
+      - daemon_net
+      - admin_net
+  shopDBMigration:
+    image: shopdbmigration
+    environment:
+      - DATABASE_URL=shopDB
+    networks:
+      - customer_net
+      - daemon_net
+      - admin_net
+  admin:
+    image: admin
+    environment:
+      - DATABASE_URL=shopDB
+    ports:
+    - 6003:6003
+    networks:
+      - admin_net
+  warehouse:
+    image: warehouse
+    environment:
+      - DATABASE_URL=shopDB
+    ports:
+    - 6001:6001
+    networks:
+      - ware_net
+    deploy:
+      replicas: 3
+  daemon:
+    image: daemon
+    environment:
+      - DATABASE_URL=shopDB
+    networks:
+      - daemon_net
+  customer:
+    image: customer
+    environment:
+      - DATABASE_URL=shopDB
+    ports:
+    - 6002:6002
+    networks:
+      - customer_net
+    deploy:
+      replicas: 3
+  adminer:
+    image: adminer
+    ports:
+      - 8080:8080
+    networks:
+      - auth_net
+      - customer_net
+      - daemon_net
+      - admin_net
+      - ware_net
+
+  redis:
+    image: redis
+    ports:
+        - 6380:6379
+    networks:
+      - daemon_net
+      - ware_net
+
+volumes:
+  dbdata:
+  dbdatashop:
+
+networks:
+  auth_net:
+    driver: overlay
+  customer_net:
+    driver: overlay
+  daemon_net:
+    driver: overlay
+  admin_net:
+    driver: overlay
+  ware_net:
+    driver: overlay
